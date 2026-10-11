@@ -79,11 +79,22 @@ class ConnectionManager:
         self._connections[room_code][participant_id] = websocket
         await self._ensure_redis_listener()
 
-    def disconnect(self, room_code: str, participant_id: str) -> None:
-        if room_code in self._connections:
-            self._connections[room_code].pop(participant_id, None)
-            if not self._connections[room_code]:
-                del self._connections[room_code]
+    def disconnect(
+        self,
+        room_code: str,
+        participant_id: str,
+        websocket: WebSocket | None = None,
+    ) -> bool:
+        connections = self._connections.get(room_code)
+        if not connections:
+            return False
+        current = connections.get(participant_id)
+        if websocket is not None and current is not websocket:
+            return False
+        connections.pop(participant_id, None)
+        if not connections:
+            del self._connections[room_code]
+        return True
 
     async def broadcast(self, room_code: str, event: dict[str, Any]) -> None:
         await self._broadcast_local(room_code, event)

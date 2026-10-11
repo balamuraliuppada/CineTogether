@@ -240,28 +240,29 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
         except Exception:
             pass
     finally:
-        ws_manager.disconnect(room_code.upper(), participant_id)
-        try:
+        was_current_connection = ws_manager.disconnect(room_code.upper(), participant_id, websocket)
+        if was_current_connection:
+            try:
                 await asyncio.to_thread(
                     room_service.set_participant_status,
                     room_code,
                     participant_id,
                     ConnectionStatus.DISCONNECTED,
                 )
-        except (ParticipantNotFoundError, RoomNotFoundError):
-            pass
-        await ws_manager.broadcast(
-            room_code.upper(),
-            {
-                "type": "participant_left",
-                "room_code": room_code.upper(),
-                "sender_id": participant_id,
-                "payload": {
-                    "participant_id": participant_id,
-                    "status": "disconnected",
-                    "display_name": room.participants[participant_id].display_name
-                    if participant_id in room.participants
-                    else "Participant",
+            except (ParticipantNotFoundError, RoomNotFoundError):
+                pass
+            await ws_manager.broadcast(
+                room_code.upper(),
+                {
+                    "type": "participant_left",
+                    "room_code": room_code.upper(),
+                    "sender_id": participant_id,
+                    "payload": {
+                        "participant_id": participant_id,
+                        "status": "disconnected",
+                        "display_name": room.participants[participant_id].display_name
+                        if participant_id in room.participants
+                        else "Participant",
+                    },
                 },
-            },
-        )
+            )
