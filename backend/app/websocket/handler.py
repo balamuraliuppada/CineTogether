@@ -117,7 +117,7 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
             # cannot be overwritten by this connection's old snapshot.
             if (
                 event_type.startswith("playback_")
-                or event_type in {"movie_selected", "movie_cleared", "chat_message"}
+                or event_type in {"movie_selected", "movie_cleared", "chat_message", "host_transfer"}
             ):
                 try:
                     room = await asyncio.to_thread(room_service.get_room, room_code)
