@@ -1,5 +1,6 @@
 import json
 import asyncio
+import logging
 from uuid import uuid4
 from typing import Any
 
@@ -7,6 +8,8 @@ from fastapi import WebSocket
 from redis.asyncio import Redis
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class ConnectionManager:
@@ -21,8 +24,15 @@ class ConnectionManager:
     async def _ensure_redis_listener(self) -> None:
         if not settings.redis_url or self._redis_listener and not self._redis_listener.done():
             return
-        self._redis = Redis.from_url(settings.redis_url, decode_responses=True)
-        self._redis_listener = asyncio.create_task(self._listen_for_remote_events())
+        try:
+            self._redis = Redis.from_url(settings.redis_url, decode_responses=True)
+            self._redis_listener = asyncio.create_task(self._listen_for_remote_events())
+        except Exception:
+            # A malformed or unavailable optional Redis URL must not prevent
+            # local WebSocket clients from using chat and room events.
+            logger.exception("Redis listener could not be initialized")
+            self._redis = None
+            self._redis_listener = None
 
     async def _listen_for_remote_events(self) -> None:
         if self._redis is None:
