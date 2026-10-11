@@ -1,3 +1,4 @@
+import asyncio
 import json
 import html
 import logging
@@ -42,7 +43,7 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
         return
 
     try:
-        room = room_service.get_room(room_code)
+        room = await asyncio.to_thread(room_service.get_room, room_code)
     except RoomNotFoundError:
         await websocket.close(code=4004, reason="Room not found")
         return
@@ -54,11 +55,6 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
     await ws_manager.connect(room_code.upper(), participant_id, websocket)
 
     try:
-        try:
-            room_service.set_participant_status(room_code, participant_id, ConnectionStatus.CONNECTED)
-        except Exception:
-            logger.exception("Could not persist connected status for room=%s participant=%s", room_code, participant_id)
-
         await ws_manager.send(
             room_code.upper(),
             participant_id,
@@ -92,6 +88,16 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
                 },
             },
         )
+        try:
+            await asyncio.to_thread(
+                room_service.set_participant_status,
+                room_code,
+                participant_id,
+                ConnectionStatus.CONNECTED,
+            )
+        except Exception:
+            logger.exception("Could not persist connected status for room=%s participant=%s", room_code, participant_id)
+
         while True:
             data = await websocket.receive_text()
             try:
@@ -114,7 +120,7 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
                 or event_type in {"movie_selected", "movie_cleared", "chat_message"}
             ):
                 try:
-                    room = room_service.get_room(room_code)
+                    room = await asyncio.to_thread(room_service.get_room, room_code)
                 except RoomNotFoundError:
                     await _send_error(room_code.upper(), participant_id, "Room no longer exists")
                     continue
@@ -147,7 +153,7 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
                 )
                 room.chat_history.append(message)
                 del room.chat_history[:-MAX_CHAT_HISTORY]
-                room_service.save_room(room)
+                await asyncio.to_thread(room_service.save_room, room)
                 await ws_manager.broadcast(
                     room_code.upper(),
                     {
@@ -162,7 +168,12 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
             if event_type == "host_transfer":
                 target_id = str(payload.get("participant_id", ""))
                 try:
-                    room = room_service.transfer_host(room_code, participant_id, target_id)
+                    room = await asyncio.to_thread(
+                        room_service.transfer_host,
+                        room_code,
+                        participant_id,
+                        target_id,
+                    )
                 except (HostTransferError, ParticipantNotFoundError) as transfer_error:
                     await _send_error(room_code.upper(), participant_id, str(transfer_error))
                     continue
@@ -209,7 +220,7 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
                 room.playback.control_version += 1
 
             room.playback.last_update = datetime.utcnow()
-            room_service.save_room(room)
+            await asyncio.to_thread(room_service.save_room, room)
 
             await ws_manager.broadcast(
                 room_code.upper(),
@@ -231,7 +242,12 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
     finally:
         ws_manager.disconnect(room_code.upper(), participant_id)
         try:
-            room_service.set_participant_status(room_code, participant_id, ConnectionStatus.DISCONNECTED)
+                await asyncio.to_thread(
+                    room_service.set_participant_status,
+                    room_code,
+                    participant_id,
+                    ConnectionStatus.DISCONNECTED,
+                )
         except (ParticipantNotFoundError, RoomNotFoundError):
             pass
         await ws_manager.broadcast(
