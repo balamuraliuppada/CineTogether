@@ -23,6 +23,10 @@ class ParticipantNotFoundError(Exception):
     pass
 
 
+class HostTransferError(Exception):
+    pass
+
+
 class RoomService:
     """Room management backed by PostgreSQL when DATABASE_URL is configured."""
 
@@ -67,6 +71,9 @@ class RoomService:
             room_repository.save(room)
         else:
             self._rooms[room.code] = room
+
+    def save_room(self, room: Room) -> None:
+        self._save_room(room)
 
     def create_room(self, display_name: str) -> tuple[Room, Participant]:
         code = self._generate_code()
@@ -124,6 +131,18 @@ class RoomService:
             raise ParticipantNotFoundError(f"Participant '{participant_id}' not in room")
         room.participants[participant_id].connection_status = status
         self._save_room(room)
+
+    def transfer_host(self, code: str, current_host_id: str, new_host_id: str) -> Room:
+        room = self._get_room(code)
+        if room.host_id != current_host_id:
+            raise HostTransferError("Only the current host can transfer host access")
+        if new_host_id not in room.participants:
+            raise ParticipantNotFoundError(f"Participant '{new_host_id}' not in room")
+        room.host_id = new_host_id
+        for participant in room.participants.values():
+            participant.is_host = participant.id == new_host_id
+        self._save_room(room)
+        return room
 
     def cleanup_expired(self) -> int:
         now = datetime.utcnow()

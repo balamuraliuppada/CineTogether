@@ -15,6 +15,7 @@ interface RoomContextValue {
   setSession: (session: SessionInfo | null) => void;
   chatMessages: ChatMessage[];
   addChatMessage: (msg: ChatMessage) => void;
+  replaceChatMessages: (messages: ChatMessage[]) => void;
   wsConnected: boolean;
   setWsConnected: (connected: boolean) => void;
 }
@@ -28,8 +29,9 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const [wsConnected, setWsConnected] = useState(false);
 
   const addChatMessage = useCallback((msg: ChatMessage) => {
-    setChatMessages((prev) => [...prev, msg]);
+    setChatMessages((prev) => (prev.some((item) => item.id === msg.id) ? prev : [...prev, msg]));
   }, []);
+  const replaceChatMessages = useCallback((messages: ChatMessage[]) => setChatMessages(messages), []);
 
   const value = useMemo(
     () => ({
@@ -39,10 +41,11 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       setSession,
       chatMessages,
       addChatMessage,
+      replaceChatMessages,
       wsConnected,
       setWsConnected,
     }),
-    [room, session, chatMessages, addChatMessage, wsConnected],
+    [room, session, chatMessages, addChatMessage, replaceChatMessages, wsConnected],
   );
 
   return <RoomContext.Provider value={value}>{children}</RoomContext.Provider>;

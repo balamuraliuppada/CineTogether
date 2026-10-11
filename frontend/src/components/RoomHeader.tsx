@@ -1,11 +1,16 @@
 import { Check, Copy, Film, Users, Wifi, WifiOff } from 'lucide-react';
 import { useState } from 'react';
+import type { Participant } from '../types/room';
 
 interface RoomHeaderProps {
   roomCode: string;
   participantCount: number;
   maxCapacity: number;
   connected: boolean;
+  isHost?: boolean;
+  localParticipantId?: string;
+  participants?: Participant[];
+  onTransferHost?: (participantId: string) => void;
 }
 
 export default function RoomHeader({
@@ -13,8 +18,13 @@ export default function RoomHeader({
   participantCount,
   maxCapacity,
   connected,
+  isHost = false,
+  localParticipantId,
+  participants = [],
+  onTransferHost,
 }: RoomHeaderProps) {
   const [copied, setCopied] = useState(false);
+  const [transferTarget, setTransferTarget] = useState('');
 
   const copyLink = async () => {
     const url = `${window.location.origin}/room/${roomCode}`;
@@ -54,6 +64,28 @@ export default function RoomHeader({
             {connected ? 'Connected' : 'Connecting…'}
           </span>
         </div>
+
+        {isHost && participants.length > 1 && (
+          <select
+            value={transferTarget}
+            onChange={(event) => {
+              const target = event.target.value;
+              setTransferTarget('');
+              if (target) onTransferHost?.(target);
+            }}
+            className="max-w-36 rounded-lg border border-navy-700 bg-navy-800 px-2 py-1.5 text-xs text-slate-300"
+            aria-label="Transfer host"
+          >
+            <option value="">Transfer host</option>
+            {participants
+              .filter((participant) => participant.id !== localParticipantId)
+              .map((participant) => (
+                <option key={participant.id} value={participant.id}>
+                  {participant.display_name}
+                </option>
+              ))}
+          </select>
+        )}
 
         <button
           onClick={copyLink}

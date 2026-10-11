@@ -9,7 +9,11 @@ export function useLiveKitRoom(roomCode: string | null, participantId: string | 
   const movieTracksRef = useRef<(LocalVideoTrack | LocalAudioTrack)[]>([]);
   const [status, setStatus] = useState<LiveKitStatus>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [, setRevision] = useState(0);
+  const [revision, setRevision] = useState(0);
+  const [localCameraEnabled, setLocalCameraEnabled] = useState(false);
+  const [localMicrophoneEnabled, setLocalMicrophoneEnabled] = useState(false);
+  const cameraBusyRef = useRef(false);
+  const microphoneBusyRef = useRef(false);
 
   useEffect(() => {
     if (!roomCode || !participantId) return;
@@ -38,6 +42,12 @@ export function useLiveKitRoom(roomCode: string | null, participantId: string | 
         const liveKitUrl = import.meta.env.VITE_LIVEKIT_URL || mediaToken.livekit_url;
         if (!liveKitUrl) throw new Error('LiveKit URL is not configured.');
         await liveKitRoom.connect(liveKitUrl, mediaToken.token);
+        const savedMic = localStorage.getItem(`cine-mic-${roomCode}-${participantId}`) === 'true';
+        const savedCamera = localStorage.getItem(`cine-camera-${roomCode}-${participantId}`) === 'true';
+        await liveKitRoom.localParticipant.setMicrophoneEnabled(savedMic);
+        await liveKitRoom.localParticipant.setCameraEnabled(savedCamera);
+        setLocalMicrophoneEnabled(savedMic);
+        setLocalCameraEnabled(savedCamera);
         if (!disposed) setStatus('connected');
       } catch (connectError) {
         if (!disposed) {
@@ -64,16 +74,40 @@ export function useLiveKitRoom(roomCode: string | null, participantId: string | 
     : [];
 
   const toggleMicrophone = async () => {
-    if (localParticipant) {
-      await localParticipant.setMicrophoneEnabled(!localParticipant.isMicrophoneEnabled);
-      setRevision((revision) => revision + 1);
+    const participant = roomRef.current?.localParticipant;
+    if (participant && !microphoneBusyRef.current) {
+      microphoneBusyRef.current = true;
+      try {
+        const enabled = !participant.isMicrophoneEnabled;
+        await participant.setMicrophoneEnabled(enabled);
+        setLocalMicrophoneEnabled(enabled);
+        localStorage.setItem(
+          `cine-mic-${roomCode}-${participantId}`,
+          String(enabled),
+        );
+        setRevision((revision) => revision + 1);
+      } finally {
+        microphoneBusyRef.current = false;
+      }
     }
   };
 
   const toggleCamera = async () => {
-    if (localParticipant) {
-      await localParticipant.setCameraEnabled(!localParticipant.isCameraEnabled);
-      setRevision((revision) => revision + 1);
+    const participant = roomRef.current?.localParticipant;
+    if (participant && !cameraBusyRef.current) {
+      cameraBusyRef.current = true;
+      try {
+        const enabled = !participant.isCameraEnabled;
+        await participant.setCameraEnabled(enabled);
+        setLocalCameraEnabled(enabled);
+        localStorage.setItem(
+          `cine-camera-${roomCode}-${participantId}`,
+          String(enabled),
+        );
+        setRevision((revision) => revision + 1);
+      } finally {
+        cameraBusyRef.current = false;
+      }
     }
   };
 
@@ -105,6 +139,17 @@ export function useLiveKitRoom(roomCode: string | null, participantId: string | 
     setRevision((revision) => revision + 1);
   };
 
+  const clearPublishedMovie = async () => {
+    const localParticipant = roomRef.current?.localParticipant;
+    if (!localParticipant) return;
+    for (const movieTrack of movieTracksRef.current) {
+      await localParticipant.unpublishTrack(movieTrack);
+      movieTrack.stop();
+    }
+    movieTracksRef.current = [];
+    setRevision((revision) => revision + 1);
+  };
+
   const moviePublications = [
     ...(localParticipant ? Array.from(localParticipant.trackPublications.values()) : []),
     ...remoteParticipants.flatMap((participant) =>
@@ -115,6 +160,10 @@ export function useLiveKitRoom(roomCode: string | null, participantId: string | 
     (publication) => publication.trackName === 'movie-video',
   )?.track;
 
+  const remoteMovieVideoTrack = remoteParticipants
+    .flatMap((participant) => Array.from(participant.trackPublications.values()))
+    .find((publication) => publication.trackName === 'movie-video')?.track;
+
   const movieAudioTrack = remoteParticipants
     .flatMap((participant) => Array.from(participant.trackPublications.values()))
     .find((publication) => publication.trackName === 'movie-audio')?.track;
@@ -124,12 +173,15 @@ export function useLiveKitRoom(roomCode: string | null, participantId: string | 
     remoteParticipants,
     status,
     error,
-    micEnabled: localParticipant?.isMicrophoneEnabled ?? false,
-    cameraEnabled: localParticipant?.isCameraEnabled ?? false,
+    micEnabled: localMicrophoneEnabled,
+    cameraEnabled: localCameraEnabled,
+    mediaRevision: revision,
     toggleMicrophone,
     toggleCamera,
     publishMovie,
+    clearPublishedMovie,
     movieVideoTrack,
+    remoteMovieVideoTrack,
     movieAudioTrack,
   };
 }

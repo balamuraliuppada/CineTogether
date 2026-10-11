@@ -50,6 +50,7 @@ def _room_to_response(room: Room) -> RoomResponse:
         ],
         playback=PlaybackStateResponse(
             movie_title=room.playback.movie_title,
+            duration=room.playback.duration,
             is_playing=room.playback.is_playing,
             position=room.playback.position,
             last_update=room.playback.last_update,

@@ -7,6 +7,7 @@ interface VideoGridProps {
   localParticipantId: string;
   liveKitLocalParticipant?: LiveKitParticipant;
   liveKitRemoteParticipants?: LiveKitParticipant[];
+  mediaRevision?: number;
 }
 
 export default function VideoGrid({
@@ -14,6 +15,7 @@ export default function VideoGrid({
   localParticipantId,
   liveKitLocalParticipant,
   liveKitRemoteParticipants = [],
+  mediaRevision = 0,
 }: VideoGridProps) {
   return (
     <div className="flex flex-col h-full bg-navy-900 rounded-xl border border-navy-700 overflow-hidden">
@@ -27,7 +29,7 @@ export default function VideoGrid({
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {participants.map((p) => (
           <ParticipantTile
-            key={p.id}
+            key={`${p.id}-${mediaRevision}`}
             participant={p}
             isLocal={p.id === localParticipantId}
             cameraEnabled={

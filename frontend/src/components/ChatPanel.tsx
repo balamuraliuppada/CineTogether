@@ -7,6 +7,9 @@ interface ChatPanelProps {
   participants: Participant[];
   onSendMessage: (content: string) => void;
   disabled?: boolean;
+  isHost?: boolean;
+  localParticipantId?: string;
+  onTransferHost?: (participantId: string) => void;
 }
 
 type Tab = 'chat' | 'people';
@@ -16,6 +19,9 @@ export default function ChatPanel({
   participants,
   onSendMessage,
   disabled = false,
+  isHost = false,
+  localParticipantId,
+  onTransferHost,
 }: ChatPanelProps) {
   const [tab, setTab] = useState<Tab>('chat');
   const [input, setInput] = useState('');
@@ -143,6 +149,14 @@ export default function ChatPanel({
               >
                 {p.connection_status}
               </span>
+              {isHost && p.id !== localParticipantId && (
+                <button
+                  onClick={() => onTransferHost?.(p.id)}
+                  className="ml-2 text-[10px] text-accent-blue hover:text-slate-200"
+                >
+                  Make host
+                </button>
+              )}
             </div>
           ))}
         </div>

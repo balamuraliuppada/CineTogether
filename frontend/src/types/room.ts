@@ -8,6 +8,7 @@ export interface Participant {
 
 export interface PlaybackState {
   movie_title: string | null;
+  duration: number;
   is_playing: boolean;
   position: number;
   last_update: string;

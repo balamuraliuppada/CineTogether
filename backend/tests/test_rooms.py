@@ -115,3 +115,21 @@ def test_websocket_chat_is_sanitized_and_replayed(client):
         history = websocket.receive_json()
         assert history["type"] == "chat_history"
         assert history["payload"]["messages"][0]["content"] == "&lt;b&gt;Hello&lt;/b&gt;"
+
+
+def test_playback_update_keeps_participants_joined_after_websocket_open(client):
+    create = client.post("/api/v1/rooms", json={"display_name": "Host"}).json()
+    code = create["room"]["code"]
+    host_id = create["participant_id"]
+    guest = client.post(f"/api/v1/rooms/{code}/join", json={"display_name": "Guest"}).json()
+
+    with client.websocket_connect(f"/ws/rooms/{code}?participant_id={host_id}") as websocket:
+        assert websocket.receive_json()["type"] == "playback_state"
+        assert websocket.receive_json()["type"] == "chat_history"
+        assert websocket.receive_json()["type"] == "participant_joined"
+        websocket.send_json({"type": "movie_selected", "payload": {"title": "movie.mp4"}})
+        assert websocket.receive_json()["type"] == "movie_selected"
+
+    room = client.get(f"/api/v1/rooms/{code}").json()
+    assert {participant["id"] for participant in room["participants"]} == {host_id, guest["participant_id"]}
+    assert room["playback"]["movie_title"] == "movie.mp4"

@@ -26,6 +26,7 @@ class Participant(BaseModel):
 
 class PlaybackState(BaseModel):
     movie_title: str | None = None
+    duration: float = 0.0
     is_playing: bool = False
     position: float = 0.0
     last_update: datetime = Field(default_factory=datetime.utcnow)

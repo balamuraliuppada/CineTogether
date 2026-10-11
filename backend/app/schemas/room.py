@@ -15,6 +15,10 @@ class LeaveRoomRequest(BaseModel):
     participant_id: str
 
 
+class TransferHostRequest(BaseModel):
+    participant_id: str
+
+
 class MediaTokenRequest(BaseModel):
     participant_id: str
 
@@ -29,6 +33,7 @@ class ParticipantResponse(BaseModel):
 
 class PlaybackStateResponse(BaseModel):
     movie_title: str | None
+    duration: float
     is_playing: bool
     position: float
     last_update: datetime
