@@ -1,5 +1,6 @@
 import json
 import html
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -11,6 +12,7 @@ from app.services.room_service import HostTransferError, ParticipantNotFoundErro
 from app.websocket.manager import ws_manager
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 MAX_CHAT_LENGTH = 500
 MAX_CHAT_HISTORY = 100
@@ -212,6 +214,12 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
             )
     except WebSocketDisconnect:
         pass
+    except Exception:
+        logger.exception("Room WebSocket failed for room=%s participant=%s", room_code, participant_id)
+        try:
+            await websocket.close(code=1011, reason="WebSocket server error")
+        except Exception:
+            pass
     finally:
         ws_manager.disconnect(room_code.upper(), participant_id)
         try:
