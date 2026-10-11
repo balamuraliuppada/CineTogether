@@ -79,6 +79,24 @@ docker compose up --build -d
 
 Open http://localhost. For a deployed domain, set `ALLOWED_ORIGINS` in `backend/.env` to the exact browser origin, for example `https://watch.example.com`, before starting Compose.
 
+### Vercel + Render deployment
+
+In Vercel, add these frontend environment variables and redeploy:
+
+```text
+VITE_API_URL=https://your-backend.onrender.com
+VITE_WS_URL=wss://your-backend.onrender.com
+VITE_LIVEKIT_URL=wss://your-project.livekit.cloud
+```
+
+In Render, set `ALLOWED_ORIGINS` to the exact Vercel URL, including `https://`, for example:
+
+```text
+ALLOWED_ORIGINS=https://your-app.vercel.app
+```
+
+The WebSocket URL must use `wss://` when the Vercel site uses HTTPS. Vercel's SPA rewrite does not replace a WebSocket connection with the Render backend.
+
 Useful commands:
 
 ```bash

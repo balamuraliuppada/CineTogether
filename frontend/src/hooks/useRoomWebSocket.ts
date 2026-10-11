@@ -1,7 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RoomEvent } from '../types/room';
 
-const WS_URL = import.meta.env.VITE_API_URL?.replace(/^http/, 'ws') || `ws://${window.location.host}`;
+function resolveWebSocketUrl(): string {
+  const configuredUrl = import.meta.env.VITE_WS_URL?.trim() || import.meta.env.VITE_API_URL?.trim();
+  if (configuredUrl) {
+    const normalizedUrl = configuredUrl.replace(/\/+$/, '');
+    if (normalizedUrl.startsWith('https://')) return normalizedUrl.replace(/^https:/, 'wss:');
+    if (normalizedUrl.startsWith('http://')) return normalizedUrl.replace(/^http:/, 'ws:');
+    if (normalizedUrl.startsWith('wss://') || normalizedUrl.startsWith('ws://')) return normalizedUrl;
+  }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}`;
+}
+
+const WS_URL = resolveWebSocketUrl();
 
 export function useRoomWebSocket(
   roomCode: string | null,
