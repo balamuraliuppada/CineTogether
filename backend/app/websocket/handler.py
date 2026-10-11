@@ -52,9 +52,13 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
         return
 
     await ws_manager.connect(room_code.upper(), participant_id, websocket)
-    room_service.set_participant_status(room_code, participant_id, ConnectionStatus.CONNECTED)
 
     try:
+        try:
+            room_service.set_participant_status(room_code, participant_id, ConnectionStatus.CONNECTED)
+        except Exception:
+            logger.exception("Could not persist connected status for room=%s participant=%s", room_code, participant_id)
+
         await ws_manager.send(
             room_code.upper(),
             participant_id,
@@ -105,7 +109,10 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
             # The websocket may stay open while other participants join. Reload the
             # persisted room before mutating playback so those newer participants
             # cannot be overwritten by this connection's old snapshot.
-            if event_type.startswith("playback_") or event_type in {"movie_selected", "movie_cleared"}:
+            if (
+                event_type.startswith("playback_")
+                or event_type in {"movie_selected", "movie_cleared", "chat_message"}
+            ):
                 try:
                     room = room_service.get_room(room_code)
                 except RoomNotFoundError:
@@ -140,6 +147,7 @@ async def room_websocket(websocket: WebSocket, room_code: str) -> None:
                 )
                 room.chat_history.append(message)
                 del room.chat_history[:-MAX_CHAT_HISTORY]
+                room_service.save_room(room)
                 await ws_manager.broadcast(
                     room_code.upper(),
                     {
